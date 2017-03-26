@@ -13,10 +13,6 @@ foreach ($cursor->toArray() as $collection) {
 
 $actions = ['overview', 'view'];
 
-$database['carbrands'] = [0 => 'Audi', 1 => 'BMW', 2 => 'Mercedes'];
-
-$tables = array_keys($database);
-
 // get the HTTP method, path and body of the request
 $method = $_SERVER['REQUEST_METHOD'];
 $request = explode('/', trim($_SERVER['PATH_INFO'],'/'));
@@ -37,12 +33,8 @@ if (in_array($collection, $collections) || in_array($action, $actions)) {
 			$cursor = $manager->executeQuery('demodata.carbrands', $query);			
 			$items = $cursor->toArray();
 			if (count($items) > 0) {
-			
-				echo '<ul>';
-				foreach ($items as $item) {
-					echo '<li>'.$item->name.'</li>';
-				}
-				echo '</ul>';			
+				header('Content-type:application/json;charset=utf-8');
+				echo $output = json_encode($items);
 			} else {
 				throw new Exception('No data found');
 			} 
@@ -55,11 +47,8 @@ if (in_array($collection, $collections) || in_array($action, $actions)) {
 			// Output of the executeQuery will be object of MongoDB\Driver\Cursor class
 			$cursor = $manager->executeQuery('demodata.carbrands', $query);			
 			
-			echo '<ul>';
-			foreach ($cursor->toArray() as $item) {
-				echo '<li>'.$item->name.'</li>';
-			}
-			echo '</ul>';
+			header('Content-type:application/json;charset=utf-8');
+			echo json_encode($cursor->toArray());
 			break;
 	}	
 	
