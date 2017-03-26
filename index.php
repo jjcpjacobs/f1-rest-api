@@ -25,9 +25,9 @@ $action = preg_replace('/[^a-z0-9_]+/i','',array_shift($request));
 if (in_array($collection, $collections) || in_array($action, $actions)) {	
 	switch($action) {
 		case 'view':
-			$key = array_shift($request)+0;
+			$key = array_shift($request);
 			// Query Class
-			$query = new MongoDB\Driver\Query(['id' => $key]);
+			$query = new MongoDB\Driver\Query(['_id' => new MongoDB\BSON\ObjectID($key)]);
 
 			// Output of the executeQuery will be object of MongoDB\Driver\Cursor class
 			$cursor = $manager->executeQuery('demodata.carbrands', $query);			
