@@ -8,10 +8,8 @@ $cursor = $manager->executeCommand('demodata', $command);
 
 $collections = [];
 foreach ($cursor->toArray() as $collection) {
-	array_push($collections, $collection);
+	array_push($collections, $collection->name);
 }
-
-$actions = ['add', 'delete', 'update', 'overview', 'view'];
 
 // get the HTTP method, path and body of the request
 $method = $_SERVER['REQUEST_METHOD'];
@@ -22,85 +20,76 @@ $input = json_decode(file_get_contents('php://input'),true);
 $collection = preg_replace('/[^a-z0-9_]+/i','',array_shift($request));
 $action = preg_replace('/[^a-z0-9_]+/i','',array_shift($request));
 
-if (in_array($collection, $collections) || in_array($action, $actions)) {	
+if (in_array($collection, $collections)) {	
 	switch($method) {
 		case 'DELETE':
-			if ($action == 'delete') {
-				$bulk = new MongoDB\Driver\BulkWrite(['ordered' => true]);
-				$key = array_shift($request);
-				
-				$param = ['_id' => new MongoDB\BSON\ObjectID($key)];
-				$bulk->delete($param);
-				$manager->executeBulkWrite('demodata.'.$collection, $bulk);
-				echo json_encode(['success' => true]);
-			}
+			$bulk = new MongoDB\Driver\BulkWrite(['ordered' => true]);
+			$key = array_shift($request);
+
+			$param = ['_id' => new MongoDB\BSON\ObjectID($key)];
+			$bulk->delete($param);
+			$manager->executeBulkWrite('demodata.'.$collection, $bulk);
+			echo json_encode(['success' => true]);
 			break;
 		case 'POST':
-			if ($action == 'add') {
-				$bulk = new MongoDB\Driver\BulkWrite(['ordered' => true]);
-				$params = [];
+			$bulk = new MongoDB\Driver\BulkWrite(['ordered' => true]);
+			$params = [];
 
-				foreach ($_POST as $key => $value) {
-					$params[$key] = $value;
-				}
-				$bulk->insert($params);
-				$manager->executeBulkWrite('demodata.'.$collection, $bulk);
-				echo json_encode(['success' => true]);
-			} else {
-				echo json_encode(['error' => 'Wrong arguments']);
+			foreach ($_POST as $key => $value) {
+				$params[$key] = $value;
 			}
+			$bulk->insert($params);
+			$manager->executeBulkWrite('demodata.'.$collection, $bulk);
+			echo json_encode(['success' => true]);
 			break;
 		case 'PUT':
-			if ($action == 'update') {
-				$bulk = new MongoDB\Driver\BulkWrite(['ordered' => true]);
-				$params = [];
+			$bulk = new MongoDB\Driver\BulkWrite(['ordered' => true]);
+			$params = [];
 
-				parse_str(file_get_contents("php://input"),$_POST);
+			parse_str(file_get_contents("php://input"),$_POST);
 
-				foreach ($_POST as $key => $value) {
-					if ($key == '_id') {
-						$_id = $value;
-						
-						unset($params[$key]);
-					} else {					
-						$params[$key] = $value;
-					}
+			foreach ($_POST as $key => $value) {
+				if ($key == '_id') {
+					$_id = $value;
+
+					unset($params[$key]);
+				} else {					
+					$params[$key] = $value;
 				}
-				$bulk->update(['_id' => new MongoDB\BSON\ObjectId($_id)], ['$set'=> $params]);
-				$manager->executeBulkWrite('demodata.'.$collection, $bulk);
-				echo json_encode(['success' => true]);				
 			}
+			$bulk->update(['_id' => new MongoDB\BSON\ObjectId($_id)], ['$set'=> $params]);
+			$manager->executeBulkWrite('demodata.'.$collection, $bulk);
+			echo json_encode(['success' => true]);				
 			break;
 		case 'GET':
-			switch($action) {
-				case 'view':
-					$key = array_shift($request);
-					// Query Class
-					$query = new MongoDB\Driver\Query(['_id' => new MongoDB\BSON\ObjectID($key)]);
+			if (count($request) == 1) {
+				$key = array_shift($request);
+				// Query Class
+				$query = new MongoDB\Driver\Query(['_id' => new MongoDB\BSON\ObjectID($key)]);
 
-					// Output of the executeQuery will be object of MongoDB\Driver\Cursor class
-					$cursor = $manager->executeQuery('demodata.'.$collection, $query);			
-					$items = $cursor->toArray();
-					if (count($items) > 0) {
-						header('Content-type:application/json;charset=utf-8');
-						echo $output = json_encode($items);
-					} else {
-						echo json_encode(['error' => 'No data found']);
-					} 
-					break;
-				case 'overview':
-					// Query Class
-					$query = new MongoDB\Driver\Query([]);
-
-					// Output of the executeQuery will be object of MongoDB\Driver\Cursor class
-					$cursor = $manager->executeQuery('demodata.'.$collection, $query);			
-
+				// Output of the executeQuery will be object of MongoDB\Driver\Cursor class
+				$cursor = $manager->executeQuery('demodata.'.$collection, $query);			
+				$items = $cursor->toArray();
+				if (count($items) > 0) {
 					header('Content-type:application/json;charset=utf-8');
-					echo json_encode($cursor->toArray());
-					break;			
-				default:
-					break;					
+					echo $output = json_encode($items);
+				} else {
+					echo json_encode(['error' => 'No data found']);
+				} 
+			} else {		
+				// Query Class
+				$query = new MongoDB\Driver\Query([]);
+
+				// Output of the executeQuery will be object of MongoDB\Driver\Cursor class
+				$cursor = $manager->executeQuery('demodata.'.$collection, $query);			
+
+				header('Content-type:application/json;charset=utf-8');
+				echo json_encode($cursor->toArray());
 			}
+			break;
+		default:
+			echo json_encode(['error' => 'unknown action or not allowed']);
+			break;					
 
 	}
 } else {
