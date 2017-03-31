@@ -1,5 +1,7 @@
 <?php
 
+include('model.php');
+
 // Manager Class
 $manager = new MongoDB\Driver\Manager("mongodb://mongo:27017");
 
@@ -18,7 +20,6 @@ $input = json_decode(file_get_contents('php://input'),true);
 
 // retrieve the table and key from the path
 $collection = preg_replace('/[^a-z0-9_]+/i','',array_shift($request));
-$action = preg_replace('/[^a-z0-9_]+/i','',array_shift($request));
 
 if (in_array($collection, $collections)) {	
 	switch($method) {
@@ -64,8 +65,11 @@ if (in_array($collection, $collections)) {
 		case 'GET':
 			if (count($request) == 1) {
 				$key = array_shift($request);
+				
+				$params['_id'] = new MongoDB\BSON\ObjectID($key);
+
 				// Query Class
-				$query = new MongoDB\Driver\Query(['_id' => new MongoDB\BSON\ObjectID($key)]);
+				$query = new MongoDB\Driver\Query($params);
 
 				// Output of the executeQuery will be object of MongoDB\Driver\Cursor class
 				$cursor = $manager->executeQuery('demodata.'.$collection, $query);			
@@ -76,15 +80,28 @@ if (in_array($collection, $collections)) {
 				} else {
 					echo json_encode(['error' => 'No data found']);
 				} 
-			} else {		
+			} else {
+				
+				$params = [];
+				foreach ($driver as $field) {
+					if (isset($_GET[$field]) && $_GET[$field] != '') {
+						$params[$field] = $_GET[$field];
+					}
+				}				
 				// Query Class
-				$query = new MongoDB\Driver\Query([]);
+				$query = new MongoDB\Driver\Query($params);
 
 				// Output of the executeQuery will be object of MongoDB\Driver\Cursor class
 				$cursor = $manager->executeQuery('demodata.'.$collection, $query);			
 
-				header('Content-type:application/json;charset=utf-8');
-				echo json_encode($cursor->toArray());
+				$results = $cursor->toArray();
+			
+				if (count($results) > 0) {
+					header('Content-type:application/json;charset=utf-8');
+					echo json_encode($results);
+				} else {
+					echo json_encode(['error' => 'No data found']);
+				}
 			}
 			break;
 		default:
