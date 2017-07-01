@@ -1,5 +1,8 @@
 <?php
 
+//phpinfo();
+//exit;
+
 include('model.php');
 
 // Manager Class
@@ -15,13 +18,13 @@ foreach ($cursor->toArray() as $collection) {
 
 // get the HTTP method, path and body of the request
 $method = $_SERVER['REQUEST_METHOD'];
-$request = explode('/', trim($_SERVER['PATH_INFO'],'/'));
+$request = explode('/', trim($_SERVER['REQUEST_URI'],'/'));
 $input = json_decode(file_get_contents('php://input'),true);
 
 // retrieve the table and key from the path
-$collection = preg_replace('/[^a-z0-9_]+/i','',array_shift($request));
+$collection = $_GET['collection'];
 
-if (in_array($collection, $collections)) {	
+if (in_array($collection, $collections)) {
 	switch($method) {
 		case 'DELETE':
 			$bulk = new MongoDB\Driver\BulkWrite(['ordered' => true]);
@@ -39,9 +42,22 @@ if (in_array($collection, $collections)) {
 			foreach ($_POST as $key => $value) {
 				$params[$key] = $value;
 			}
-			$bulk->insert($params);
-			$manager->executeBulkWrite('demodata.'.$collection, $bulk);
-			echo json_encode(['success' => true]);
+			$_id = (string)$bulk->insert($params);
+			//var_dump($_id);
+                        
+                        try {
+                            $writeConcern = new MongoDB\Driver\WriteConcern(MongoDB\Driver\WriteConcern::MAJORITY, 100);
+                            $result = $manager->executeBulkWrite('demodata.'.$collection, $bulk, $writeConcern);
+                            
+                            header('HTTP/1.1 201 Created');
+                            header('Location: http://demo.local/api/v1.0/drivers/'.$_id);
+                            //header('Content-type:application/json;charset=utf-8');
+                            echo get_headers($url)
+                            exit;
+                        } catch (MongoDB\Driver\Exception\BulkWriteException $e) {
+                            header('Content-type:application/json;charset=utf-8');
+                            echo json_encode(['success' => false]);
+                        }
 			break;
 		case 'PUT':
 			$bulk = new MongoDB\Driver\BulkWrite(['ordered' => true]);
@@ -54,48 +70,48 @@ if (in_array($collection, $collections)) {
 					$_id = $value;
 
 					unset($params[$key]);
-				} else {					
+				} else {
 					$params[$key] = $value;
 				}
 			}
 			$bulk->update(['_id' => new MongoDB\BSON\ObjectId($_id)], ['$set'=> $params]);
 			$manager->executeBulkWrite('demodata.'.$collection, $bulk);
-			echo json_encode(['success' => true]);				
+			echo json_encode(['success' => true]);
 			break;
 		case 'GET':
-			if (count($request) == 1) {
-				$key = array_shift($request);
-				
-				$params['_id'] = new MongoDB\BSON\ObjectID($key);
+			//$request = [];
+			if (isset($_GET['_id'])) {
+
+				$params['_id'] = new MongoDB\BSON\ObjectID($_GET['_id']);
 
 				// Query Class
 				$query = new MongoDB\Driver\Query($params);
 
 				// Output of the executeQuery will be object of MongoDB\Driver\Cursor class
-				$cursor = $manager->executeQuery('demodata.'.$collection, $query);			
+				$cursor = $manager->executeQuery('demodata.'.$collection, $query);
 				$items = $cursor->toArray();
 				if (count($items) > 0) {
 					header('Content-type:application/json;charset=utf-8');
 					echo $output = json_encode($items);
 				} else {
 					echo json_encode(['error' => 'No data found']);
-				} 
+				}
 			} else {
-				
+
 				$params = [];
 				foreach ($driver as $field) {
 					if (isset($_GET[$field]) && $_GET[$field] != '') {
 						$params[$field] = $_GET[$field];
 					}
-				}				
+				}
 				// Query Class
 				$query = new MongoDB\Driver\Query($params);
 
 				// Output of the executeQuery will be object of MongoDB\Driver\Cursor class
-				$cursor = $manager->executeQuery('demodata.'.$collection, $query);			
+				$cursor = $manager->executeQuery('demodata.'.$collection, $query);
 
 				$results = $cursor->toArray();
-			
+
 				if (count($results) > 0) {
 					header('Content-type:application/json;charset=utf-8');
 					echo json_encode($results);
@@ -106,7 +122,7 @@ if (in_array($collection, $collections)) {
 			break;
 		default:
 			echo json_encode(['error' => 'unknown action or not allowed']);
-			break;					
+			break;
 
 	}
 } else {
