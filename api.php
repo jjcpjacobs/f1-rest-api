@@ -52,7 +52,6 @@ if (in_array($collection, $collections)) {
                             header('HTTP/1.1 201 Created');
                             header('Location: http://demo.local/api/v1.0/drivers/'.$_id);
                             //header('Content-type:application/json;charset=utf-8');
-                            echo get_headers($url)
                             exit;
                         } catch (MongoDB\Driver\Exception\BulkWriteException $e) {
                             header('Content-type:application/json;charset=utf-8');
